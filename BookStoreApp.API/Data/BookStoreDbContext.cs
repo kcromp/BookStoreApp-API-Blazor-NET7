@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace BookStoreApp.API.Data;
 
-public partial class BookStoreDbContext : DbContext
+public partial class BookStoreDbContext : IdentityDbContext
 {
     public BookStoreDbContext()
     {
@@ -22,6 +23,8 @@ public partial class BookStoreDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        base.OnModelCreating(modelBuilder);
+
         modelBuilder.Entity<Author>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("PK__Authors__3214EC0799F2CB09");
