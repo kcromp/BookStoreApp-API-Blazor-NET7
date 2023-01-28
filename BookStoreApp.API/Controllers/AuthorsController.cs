@@ -55,6 +55,7 @@ namespace BookStoreApp.API.Controllers
         {
             if (_context.Authors == null)
             {
+                _logger.LogWarning($"Record is null for {nameof(GetAuthor)}");
                 return NotFound();
             }
 

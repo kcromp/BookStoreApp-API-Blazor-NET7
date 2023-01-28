@@ -9,6 +9,7 @@ using BookStoreApp.API.Data;
 using AutoMapper;
 using BookStoreApp.API.Dtos.Book;
 using AutoMapper.QueryableExtensions;
+using BookStoreApp.API.Static;
 
 namespace BookStoreApp.API.Controllers
 {
@@ -18,11 +19,13 @@ namespace BookStoreApp.API.Controllers
     {
         private readonly BookStoreDbContext _context;
         private readonly IMapper _mapper;
+        private readonly ILogger<BooksController> _logger;
 
-        public BooksController(BookStoreDbContext context, IMapper mapper)
+        public BooksController(BookStoreDbContext context, IMapper mapper, ILogger<BooksController> logger)
         {
             _context = context;
             _mapper = mapper;
+            _logger = logger;
         }
 
         // GET: api/Books
@@ -31,12 +34,20 @@ namespace BookStoreApp.API.Controllers
         {
             if (_context.Books == null)
             {
+                _logger.LogWarning($"No records found for {nameof(GetBooks)}");
                 return NotFound();
             }
 
-            var books = await _context.Books.Include(a => a.Author).ProjectTo<BookReadOnlyDto>(_mapper.ConfigurationProvider).ToListAsync();
-
-            return Ok(books);
+            try
+            {
+                var books = await _context.Books.Include(a => a.Author).ProjectTo<BookReadOnlyDto>(_mapper.ConfigurationProvider).ToListAsync();
+                return Ok(books);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error Performing GET in {nameof(GetBooks)}");
+                return StatusCode(500, Messages.Error500Message);
+            }
         }
 
         // GET: api/Books/5
@@ -45,18 +56,27 @@ namespace BookStoreApp.API.Controllers
         {
             if (_context.Books == null)
             {
+                _logger.LogWarning($"Record is null for {nameof(GetBook)}");
                 return NotFound();
             }
 
-
-            var book = await _context.Books.Include(q => q.Author).ProjectTo<BookDetailsDto>(_mapper.ConfigurationProvider).FirstOrDefaultAsync(q => q.Id == id);
-
-            if (book == null)
+            try
             {
-                return NotFound();
-            }
+                var book = await _context.Books.Include(q => q.Author).ProjectTo<BookDetailsDto>(_mapper.ConfigurationProvider).FirstOrDefaultAsync(q => q.Id == id);
 
-            return Ok(book);
+                if (book == null)
+                {
+                    _logger.LogWarning($"Record not found for {nameof(GetBook)} - ID {id}");
+                    return NotFound();
+                }
+
+                return Ok(book);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error Performing GET in {nameof(GetBook)}");
+                return StatusCode(500, Messages.Error500Message);
+            }
         }
 
         // PUT: api/Books/5
@@ -66,6 +86,7 @@ namespace BookStoreApp.API.Controllers
         {
             if (id != bookDto.Id)
             {
+                _logger.LogWarning($"Record ID is invalid for {nameof(PutBook)} - ID {id}");
                 return BadRequest();
             }
 
@@ -73,6 +94,7 @@ namespace BookStoreApp.API.Controllers
 
             if (book == null)
             {
+                _logger.LogWarning($"Record {nameof(Book)} not found for {nameof(PutBook)} - ID {id}");
                 return NotFound();
             }
 
@@ -87,6 +109,7 @@ namespace BookStoreApp.API.Controllers
             {
                 if (!BookExists(id))
                 {
+                    _logger.LogWarning($"Record ID does not exist for {nameof(PutBook)} - ID {id}");
                     return NotFound();
                 }
                 else
@@ -105,14 +128,24 @@ namespace BookStoreApp.API.Controllers
         {
             if (_context.Books == null)
             {
-                return Problem("Entity set 'BookStoreDbContext.Books'  is null.");
+                _logger.LogWarning("Entity set 'BookStoreDbContext.Books' is null.");
+                return Problem("Entity set 'BookStoreDbContext.Books' is null.");
             }
 
-            var book = _mapper.Map<Book>(bookDto); 
-            _context.Books.Add(book);
-            await _context.SaveChangesAsync();
+            try
+            {
+                var book = _mapper.Map<Book>(bookDto);
 
-            return CreatedAtAction(nameof(GetBook), new { id = book.Id }, book);
+                await _context.Books.AddAsync(book);
+                await _context.SaveChangesAsync();
+
+                return CreatedAtAction(nameof(GetBook), new { id = book.Id }, book);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error Performing POST in {nameof(PostBook)}", bookDto);
+                return StatusCode(500, Messages.Error500Message);
+            }
         }
 
         // DELETE: api/Books/5
@@ -121,18 +154,29 @@ namespace BookStoreApp.API.Controllers
         {
             if (_context.Books == null)
             {
+                _logger.LogWarning($"No record found for for {nameof(DeleteBook)} - ID {id}");
                 return NotFound();
             }
-            var book = await _context.Books.FindAsync(id);
-            if (book == null)
+
+            try
             {
-                return NotFound();
+                var book = await _context.Books.FindAsync(id);
+                if (book == null)
+                {
+                    _logger.LogWarning($"Record {nameof(Author)} not found for {nameof(DeleteBook)} - ID {id}");
+                    return NotFound();
+                }
+
+                _context.Books.Remove(book);
+                await _context.SaveChangesAsync();
+
+                return NoContent();
             }
-
-            _context.Books.Remove(book);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error performing DELETE for {nameof(DeleteBook)}");
+                return StatusCode(500, Messages.Error500Message);
+            }
         }
 
         private bool BookExists(int id)
