@@ -1,2 +1,2 @@
 # BookStoreApp
-Book Store App API with Blazor and .NET 7
+Book Store App API with C#, Blazor and .NET 7
